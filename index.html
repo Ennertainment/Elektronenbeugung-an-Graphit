@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Elektronenbeugung an Graphit – virtuelles Experiment</title>
+<style>
+  :root { --bg:#121417; --panel:#1c1f24; --line:#2c3138; --text:#e8eaed; --muted:#9aa3ad; --accent:#ffd84d; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overscroll-behavior:none; }
+  header { padding:10px 16px 0; }
+  h1 { font-size:1.15rem; margin:0; font-weight:600; }
+  main { display:flex; flex-direction:column; align-items:center; gap:14px; padding:10px 12px 16px; }
+  #viewport { width:min(96vw, calc(100dvh - 330px)); min-width:300px; aspect-ratio:1/1;
+    background:#000; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+    touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+  #stage { width:100%; height:100%; display:block; }
+  #panel { width:min(96vw, 520px); display:flex; flex-direction:column; gap:12px; }
+  .box { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .box h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 8px; font-weight:600; }
+  .uwert { font-size:1.6rem; font-weight:700; font-variant-numeric:tabular-nums; text-align:center; margin-bottom:6px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  input[type=range] { flex:1; height:36px; accent-color:var(--accent); }
+  button { touch-action:manipulation; background:#2a2f37; color:var(--text); border:1px solid #3a414b;
+    border-radius:8px; padding:9px 12px; font-size:1rem; min-width:44px; cursor:pointer; }
+  button:active { background:#3a414b; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .gegeben { font-size:1.05rem; }
+  ul { margin:0; padding-left:1.1em; color:var(--muted); font-size:.92rem; line-height:1.45; }
+  footer { font-size:.75rem; color:var(--muted); padding:0 16px 16px; line-height:1.4; max-width:1100px; margin:0 auto; }
+  footer a { color:var(--muted); }
+  @media (min-aspect-ratio: 5/4) {
+    main { flex-direction:row; align-items:flex-start; justify-content:center; }
+    #viewport { width:min(calc(100dvh - 80px), calc(100vw - 380px)); }
+    #panel { width:330px; }
+  }
+</style>
+</head>
+<body>
+<header><h1>Elektronenbeugung an Graphit</h1></header>
+
+<main>
+  <div id="viewport">
+    <svg id="stage" viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg">
+      <rect width="800" height="800" fill="#000"/>
+      <image id="foto" x="0" y="0" width="800" height="800" href=""/>
+      <g id="lineal"></g>
+    </svg>
+  </div>
+
+  <div id="panel">
+    <div class="box">
+      <h2>Beschleunigungsspannung</h2>
+      <div class="uwert" id="uAnzeige"></div>
+      <div class="row">
+        <button id="uMinus" aria-label="Spannung verringern">◀</button>
+        <input type="range" id="uSlider" min="0" step="1">
+        <button id="uPlus" aria-label="Spannung erhöhen">▶</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Ansicht &amp; Lineal</h2>
+      <div class="btns">
+        <button id="zoomOut" aria-label="Verkleinern">−</button>
+        <button id="zoomIn" aria-label="Vergrößern">+</button>
+        <button id="ansichtReset">Ansicht zurücksetzen</button>
+        <button id="linealReset">Lineal zurücksetzen</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Gegeben</h2>
+      <div class="gegeben" id="gegeben"></div>
+    </div>
+
+    <div class="box">
+      <h2>Bedienung</h2>
+      <ul>
+        <li>Lineal mit einem Finger verschieben.</li>
+        <li>Drehen: den runden Griff ↻ ziehen oder das Lineal mit zwei Fingern drehen.</li>
+        <li>Zoomen: zwei Finger auf dem Bild, verschieben: ein Finger auf dem Bild. Das Lineal wird beim Zoomen mitskaliert und misst immer richtig.</li>
+        <li>Tipp: Den Durchmesser eines Rings zu messen und zu halbieren ist genauer als den Radius zu messen.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Fotos der Elektronenbeugungsröhre: Stefan Richtberg,
+  <a href="https://virtuelle-experimente.de" target="_blank" rel="noopener">virtuelle-experimente.de</a>,
+  Lizenz <a href="https://creativecommons.org/licenses/by-nc-sa/3.0/de/" target="_blank" rel="noopener">CC BY-NC-SA 3.0 DE</a>.
+  Die Fotos sind unverändert. Ergänzt wurden ein digitales Messlineal und eine Zoomfunktion.
+  Diese Seite steht ebenfalls unter CC BY-NC-SA 3.0 DE.
+</footer>
+
+<script>
+/* ================= KONFIGURATION =================
+   Die Fotos legen nur das VERHÄLTNIS von Abstand L und Bildmaßstab fest:
+   Aus den Ringradien aller 18 Bilder (beide Ringe, Fit mit tan(2θ) = r/L,
+   2d·sinθ = λ, λ = h/√(2meU), d10 = 0,213 nm, d11 = 0,123 nm) ergibt sich
+   L = 841,1 Bildpixel. Wird L_MM geändert, passt sich der Maßstab des
+   Lineals automatisch an (bei L = 135 mm: 6,23 px/mm, sichtbarer Schirm ≈ 94 mm).
+*/
+const CONFIG = {
+  L_MM: 135,          // angenommener Abstand Graphitfolie – Schirm in mm
+  L_PX: 841.1,        // derselbe Abstand in Bildpixeln (aus Fit, nicht ändern)
+  LINEAL_MM: 100,     // Länge der Skala
+  U_MIN: 3.5, U_MAX: 12.0, U_SCHRITT: 0.5, U_START: 5.0,
+  BILD: U => `bilder/${U.toFixed(1)}kV.jpg`
+};
+const S = CONFIG.L_PX / CONFIG.L_MM;  // Bildpixel pro mm
+const SVGNS = "http://www.w3.org/2000/svg";
+const BILD = 800;
+
+const svg = document.getElementById("stage");
+const viewportEl = document.getElementById("viewport");
+const foto = document.getElementById("foto");
+const lineal = document.getElementById("lineal");
+
+document.getElementById("gegeben").innerHTML =
+  `Abstand Graphitfolie – Schirm: <b>L = ${(CONFIG.L_MM / 10).toLocaleString("de-DE")} cm</b>`;
+
+/* ---------- Spannung ---------- */
+const spannungen = [];
+for (let U = CONFIG.U_MIN; U <= CONFIG.U_MAX + 1e-9; U += CONFIG.U_SCHRITT) spannungen.push(Math.round(U * 10) / 10);
+const slider = document.getElementById("uSlider");
+slider.max = spannungen.length - 1;
+slider.value = spannungen.indexOf(CONFIG.U_START);
+spannungen.forEach(U => { const i = new Image(); i.src = CONFIG.BILD(U); });   // vorladen
+
+function zeigeSpannung() {
+  const U = spannungen[+slider.value];
+  foto.setAttribute("href", CONFIG.BILD(U));
+  document.getElementById("uAnzeige").textContent = "U = " + U.toLocaleString("de-DE", { minimumFractionDigits: 1 }) + " kV";
+}
+slider.addEventListener("input", zeigeSpannung);
+document.getElementById("uMinus").onclick = () => { slider.value = Math.max(0, +slider.value - 1); zeigeSpannung(); };
+document.getElementById("uPlus").onclick  = () => { slider.value = Math.min(spannungen.length - 1, +slider.value + 1); zeigeSpannung(); };
+zeigeSpannung();
+
+/* ---------- Lineal (in Bildkoordinaten: Zoom skaliert es automatisch mit) ---------- */
+const RAND = 4 * S, HOEHE = 11 * S;
+const koerper = document.createElementNS(SVGNS, "g"); koerper.id = "linealKoerper";
+const griff = document.createElementNS(SVGNS, "g"); griff.id = "drehGriff";
+lineal.append(koerper, griff);
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent.appendChild(e); return e;
+}
+el("rect", { x: -RAND, y: 0, width: CONFIG.LINEAL_MM * S + 2 * RAND, height: HOEHE, rx: 0.8 * S,
+  fill: "rgba(255,255,255,0.13)", stroke: "rgba(255,255,255,0.55)", "stroke-width": 1, "vector-effect": "non-scaling-stroke" }, koerper);
+for (let mm = 0; mm <= CONFIG.LINEAL_MM; mm++) {
+  const len = mm % 10 === 0 ? 4.5 : mm % 5 === 0 ? 3.2 : 2;
+  el("line", { x1: mm * S, y1: 0, x2: mm * S, y2: len * S, stroke: "#ffe066",
+    "stroke-width": mm % 10 === 0 ? 1.4 : 1, "vector-effect": "non-scaling-stroke" }, koerper);
+  if (mm % 10 === 0) {
+    const t = el("text", { x: mm * S, y: 8 * S, "text-anchor": "middle", fill: "#ffe066",
+      "font-size": 2.8 * S, "font-family": "-apple-system, Helvetica, Arial, sans-serif" }, koerper);
+    t.textContent = mm / 10;
+  }
+}
+const einheit = el("text", { x: 5 * S, y: 8 * S, "text-anchor": "middle", fill: "#ffe066",
+  "font-size": 1.8 * S, "font-family": "-apple-system, Helvetica, Arial, sans-serif" }, koerper);
+einheit.textContent = "cm";
+koerper.querySelectorAll("line,text").forEach(n => n.setAttribute("pointer-events", "none"));
+
+const griffKreis = el("circle", { fill: "rgba(255,216,77,0.25)", stroke: "#ffd84d", "stroke-width": 1.5, "vector-effect": "non-scaling-stroke" }, griff);
+const griffText = el("text", { "text-anchor": "middle", "dominant-baseline": "central", fill: "#ffd84d", "pointer-events": "none",
+  "font-family": "-apple-system, Helvetica, Arial, sans-serif" }, griff);
+griffText.textContent = "↻";
+
+const LINEAL_START = { x: 90, y: 715, a: 0 };
+let pose = { ...LINEAL_START };
+function zeichneLineal() { lineal.setAttribute("transform", `translate(${pose.x} ${pose.y}) rotate(${pose.a})`); }
+zeichneLineal();
+
+/* ---------- Ansicht (Zoom/Pan über die viewBox) ---------- */
+let vb = { x: 0, y: 0, w: BILD };
+function seite() { const r = viewportEl.getBoundingClientRect(); return Math.min(r.width, r.height); }
+function begrenze(v) {
+  v.w = Math.min(BILD, Math.max(100, v.w));
+  const rand = v.w * 0.3;
+  v.x = Math.min(BILD - v.w + rand, Math.max(-rand, v.x));
+  v.y = Math.min(BILD - v.w + rand, Math.max(-rand, v.y));
+  if (v.w >= BILD - 1e-6) { v.x = 0; v.y = 0; }
+  return v;
+}
+function setzeAnsicht(v) {
+  vb = begrenze(v);
+  svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.w}`);
+  // Drehgriff bleibt auf dem Bildschirm gleich groß (ca. 44 px Durchmesser)
+  const r = 22 * vb.w / seite();
+  const cx = CONFIG.LINEAL_MM * S + RAND + r + 3 * vb.w / seite();
+  griffKreis.setAttribute("cx", cx); griffKreis.setAttribute("cy", HOEHE / 2); griffKreis.setAttribute("r", r);
+  griffText.setAttribute("x", cx); griffText.setAttribute("y", HOEHE / 2); griffText.setAttribute("font-size", r * 1.3);
+}
+function zoomUm(faktor, cx, cy) {   // cx, cy in Bildkoordinaten
+  const w = Math.min(BILD, Math.max(100, vb.w / faktor));
+  setzeAnsicht({ x: cx - (cx - vb.x) * w / vb.w, y: cy - (cy - vb.y) * w / vb.w, w });
+}
+setzeAnsicht(vb);
+window.addEventListener("resize", () => setzeAnsicht(vb));
+
+document.getElementById("zoomIn").onclick  = () => zoomUm(1.5, vb.x + vb.w / 2, vb.y + vb.w / 2);
+document.getElementById("zoomOut").onclick = () => zoomUm(1 / 1.5, vb.x + vb.w / 2, vb.y + vb.w / 2);
+document.getElementById("ansichtReset").onclick = () => setzeAnsicht({ x: 0, y: 0, w: BILD });
+document.getElementById("linealReset").onclick = () => { pose = { ...LINEAL_START }; zeichneLineal(); };
+
+/* ---------- Gesten ---------- */
+function zuBild(cx, cy, inv) {
+  const p = svg.createSVGPoint(); p.x = cx; p.y = cy;
+  return p.matrixTransform(inv || svg.getScreenCTM().inverse());
+}
+const zeiger = new Map();
+let modus = null, start = null;
+
+function gestenStart() {
+  const pts = [...zeiger.values()];
+  const inv = svg.getScreenCTM().inverse();
+  start = { pts: pts.map(p => ({ ...p })), bild: pts.map(p => zuBild(p.x, p.y, inv)), pose: { ...pose }, vb: { ...vb }, inv };
+  if (modus === "drehen" && pts.length === 1) {
+    const b = start.bild[0];
+    start.winkel = Math.atan2(b.y - pose.y, b.x - pose.x) * 180 / Math.PI;
+  }
+}
+
+svg.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  svg.setPointerCapture(e.pointerId);
+  zeiger.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (zeiger.size === 1) {
+    modus = e.target.closest("#drehGriff") ? "drehen" : e.target.closest("#linealKoerper") ? "lineal" : "ansicht";
+  }
+  if (zeiger.size <= 2) gestenStart();
+});
+
+svg.addEventListener("pointermove", e => {
+  if (!zeiger.has(e.pointerId) || !start) return;
+  zeiger.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const pts = [...zeiger.values()];
+  if (pts.length !== start.pts.length) return;
+
+  if (modus === "lineal" || modus === "drehen") {
+    if (pts.length === 1) {
+      const b = zuBild(pts[0].x, pts[0].y);
+      if (modus === "lineal") {
+        pose.x = start.pose.x + b.x - start.bild[0].x;
+        pose.y = start.pose.y + b.y - start.bild[0].y;
+      } else {
+        const w = Math.atan2(b.y - pose.y, b.x - pose.x) * 180 / Math.PI;
+        pose.a = start.pose.a + (w - start.winkel);
+      }
+    } else {   // zwei Finger: Lineal starr verschieben + drehen
+      const [a0, b0] = start.bild, a = zuBild(pts[0].x, pts[0].y), b = zuBild(pts[1].x, pts[1].y);
+      const dth = Math.atan2(b.y - a.y, b.x - a.x) - Math.atan2(b0.y - a0.y, b0.x - a0.x);
+      const m0 = { x: (a0.x + b0.x) / 2, y: (a0.y + b0.y) / 2 }, m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const dx = start.pose.x - m0.x, dy = start.pose.y - m0.y, c = Math.cos(dth), s = Math.sin(dth);
+      pose.x = m.x + c * dx - s * dy;
+      pose.y = m.y + s * dx + c * dy;
+      pose.a = start.pose.a + dth * 180 / Math.PI;
+    }
+    zeichneLineal();
+  } else if (modus === "ansicht") {
+    const u0 = start.vb.w / seite();
+    if (pts.length === 1) {
+      setzeAnsicht({ x: start.vb.x - (pts[0].x - start.pts[0].x) * u0,
+                     y: start.vb.y - (pts[0].y - start.pts[0].y) * u0, w: start.vb.w });
+    } else {
+      const d0 = Math.hypot(start.pts[1].x - start.pts[0].x, start.pts[1].y - start.pts[0].y);
+      const d  = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      const w = Math.min(BILD, Math.max(100, start.vb.w * d0 / Math.max(d, 1)));
+      const u = w / seite();
+      const mc0 = { x: (start.pts[0].x + start.pts[1].x) / 2, y: (start.pts[0].y + start.pts[1].y) / 2 };
+      const mc  = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+      const P = zuBild(mc0.x, mc0.y, start.inv);   // dieser Bildpunkt bleibt unter den Fingern
+      setzeAnsicht({ x: P.x - (P.x - start.vb.x) * w / start.vb.w - (mc.x - mc0.x) * u,
+                     y: P.y - (P.y - start.vb.y) * w / start.vb.w - (mc.y - mc0.y) * u, w });
+    }
+  }
+});
+
+function zeigerEnde(e) {
+  if (!zeiger.has(e.pointerId)) return;
+  zeiger.delete(e.pointerId);
+  if (zeiger.size === 0) { modus = null; start = null; }
+  else gestenStart();
+}
+svg.addEventListener("pointerup", zeigerEnde);
+svg.addEventListener("pointercancel", zeigerEnde);
+
+svg.addEventListener("wheel", e => {
+  e.preventDefault();
+  const p = zuBild(e.clientX, e.clientY);
+  zoomUm(Math.exp(-e.deltaY * 0.0015), p.x, p.y);
+}, { passive: false });
+
+// Safari: Seitenzoom per Geste unterdrücken
+["gesturestart", "gesturechange"].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+</script>
+</body>
+</html>
